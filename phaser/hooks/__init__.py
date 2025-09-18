@@ -46,6 +46,7 @@ class LoadNionProps(Dataclass):
     path: Path
 
     diff_step: float
+    detector_offset: t.Optional[float] = None
     
 
 

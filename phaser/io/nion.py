@@ -30,11 +30,19 @@ def _get_dir(f: pane.io.FileOrPath) -> t.Optional[Path]:
     path = Path(name)
     return path.parent if path.exists() else None
 
+
+class SpatialCalibrations(pane.PaneBase, frozen=False, kw_only=True, allow_extra=True):
+    offset: float
+    scale: float
+    units: str
+
 class DetectorConfiguration(pane.PaneBase, frozen=False, kw_only=True, allow_extra=True):
     pass
 
 class CameraProcessingParameters(pane.PaneBase, frozen=False, kw_only=True, allow_extra=True):
     readout_area: t.Tuple[float, float, float, float]
+    processing: t.List[str]
+
 
 class Properties(pane.PaneBase, frozen=False, kw_only=True, allow_extra=True):
     detector_configuration:DetectorConfiguration
@@ -79,7 +87,9 @@ class NionMetadata(pane.PaneBase, frozen=False, kw_only=True, allow_extra=True):
     version:t.Optional[float]
     
     """Metadata version"""
-    intensity_calibration:t.Dict
+    spatial_calibrations: t.List[SpatialCalibrations]
+
+    intensity_calibration: t.Dict
 
     # intensity_calibration['offset']: t.Float
     # intensity_calibration['scale']: t.Float
@@ -199,20 +209,13 @@ def load_4d(path: t.Union[str, Path], scan_shape: t.Optional[t.Union[t.Tuple[int
         with io.BufferedReader(data_file.open('data.npy', mode='r')) as f:
             a = numpy.load(f)
             print(f"Loaded 'data.npy'")
-        
-
-    # if not a.size % (130*128) == 0:
-    #     raise ValueError(f"File not divisible by 130x128 (size={a.size}).")
-    #a.shape = (-1, 130, 128)
-
+    
     if a.shape[0] !=  n_y:
         raise ValueError(f"Got {a.shape[0]} y probes, expected {n_y}.")
     
     if a.shape[1] !=  n_x:
-        raise ValueError(f"Got {a.shape[1]} y probes, expected {n_x}.")
-    # a.shape = (n_y, n_x, *a.shape[1:])
+        raise ValueError(f"Got {a.shape[1]} x probes, expected {n_x}.")
 
-    # a = a[..., :128, :]  # crop junk rows
     return apply_flips(a, flips or (False, False, False)) 
 
 
