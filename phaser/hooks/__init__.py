@@ -37,10 +37,16 @@ class LoadEmpadProps(Dataclass):
 
 class LoadGatanProps(Dataclass):
     path: Path
-
+    
     diff_step: t.Optional[float] = None
     kv: t.Optional[float] = None
     adu: t.Optional[float] = None
+
+class LoadNionProps(Dataclass):
+    path: Path
+
+    diff_step: float
+    
 
 
 class LoadManualProps(Dataclass, kw_only=True):
@@ -72,9 +78,12 @@ class LoadManualProps(Dataclass, kw_only=True):
 class RawDataHook(Hook[None, RawData]):
     known = {
         'empad': ('phaser.hooks.io.empad:load_empad', LoadEmpadProps),
-        'gatan': ('phaser.hooks.io.gatan:load_gatan', LoadGatanProps, ('rsciio',)),
+        'gatan': ('phaser.hooks.io.gatan:load_gatan', LoadGatanProps),
+        'nion': ('phaser.hooks.io.nion:load_nion', LoadNionProps),
         'manual': ('phaser.hooks.io.manual:load_manual', LoadManualProps),
     }
+
+
 
 
 class ProbeHookArgs(t.TypedDict):
@@ -171,13 +180,12 @@ class PostInitArgs(t.TypedDict):
 class ScaleProps(Dataclass):
     scale: float
 
-
 class OffsetProps(Dataclass):
     offset: float
 
-
 class BinProps(Dataclass):
     bin: int
+
 
 
 class CropDataProps(Dataclass):
@@ -220,7 +228,7 @@ class PostInitHook(Hook[PostInitArgs, t.Tuple['Patterns', 'ReconsState']]):
 class EngineArgs(t.TypedDict):
     data: 'Patterns'
     state: 'ReconsState'
-    dtype: t.Type[numpy.floating]
+    dtype: DTypeLike
     xp: t.Any
     recons_name: str
     observer: 'Observer'
