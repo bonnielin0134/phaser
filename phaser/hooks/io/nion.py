@@ -67,7 +67,7 @@ def load_nion(args: None, props: LoadNionProps) -> RawData:
         # [x, y] -> [y, x]
         'shape': tuple(reversed(scan_shape)),
         'step_size': scan_step*1e10, #tuple(s*1e10 for s in reversed(scan_step)),  # m to A
-        'rotation': props.detector_offset + scan_meta.rotation_deg # may be the other way around 
+        'rotation': props.detector_rotation_offset + scan_meta.rotation_deg # may be the other way around 
         # 'affine': metadata.scan_correction[::-1, ::-1] if metadata.scan_correction is not None else None,
     }
 
