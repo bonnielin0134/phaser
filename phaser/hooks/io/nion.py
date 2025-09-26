@@ -1,6 +1,4 @@
-
 from pathlib import Path
-import warnings
 import logging
 import typing as t
 
@@ -10,13 +8,10 @@ from phaser.utils.num import Sampling
 from phaser.utils.physics import Electron
 from phaser.io.nion import load_4d, NionMetadata
 from phaser.types import cast_length
-from rsciio import digitalmicrograph as dm
 from .. import LoadNionProps, RawData
 import json
 
 import zipfile as zf
-
-
 
 
 def load_nion(args: None, props: LoadNionProps) -> RawData:
@@ -24,13 +19,14 @@ def load_nion(args: None, props: LoadNionProps) -> RawData:
 
     path = Path(props.path).expanduser()
 
-    with zf.ZipFile(path, 'r') as data_file:
+    with zf.ZipFile(path, "r") as data_file:
+        data_file = zf.ZipFile(path, mode="r")
+        json_metadata = data_file.read(
+            "metadata.json"
+        )  # Get the metadata from the file
+        json_metadata = json.loads(json_metadata.decode("utf8").replace("'", '"'))
 
-        data_file = zf.ZipFile(path, mode='r')
-        json_metadata = data_file.read('metadata.json') #Get the metadata from the file
-        json_metadata = json.loads(json_metadata.decode('utf8').replace("'", '"'))
-        
-        nion_metadata = NionMetadata.from_json(json_metadata)
+        nion_metadata = NionMetadata.from_data(json_metadata)
 
     scan_meta = nion_metadata.metadata.scan
     instr_meta = nion_metadata.metadata.instrument
@@ -42,58 +38,52 @@ def load_nion(args: None, props: LoadNionProps) -> RawData:
     camera_processing = nion_metadata.properties.camera_processing_parameters.processing
 
     spatial_units = spatial_calibration.units
-    
+
     match spatial_units:
-        case 'nm':
+        case "nm":
             scale_factor = 1e-9
         case _:
             scale_factor = 1
-    
-    scan_step = spatial_calibration.scale*scale_factor
+
+    scan_step = spatial_calibration.scale * scale_factor
     diff_step = props.diff_step
 
     logger.info(f"Scan shape: {scan_shape}, Step size: {scan_step}")
 
-
-    # probe_hook = {
-    #     'type': 'focused',
-    #     'conv_angle': metadata.conv_angle,
-    #     'defocus': metadata.defocus * 1e10 if metadata.defocus is not None else None,
-    # }
-
-
     scan_hook = {
-        'type': 'raster',
+        "type": "raster",
         # [x, y] -> [y, x]
-        'shape': tuple(reversed(scan_shape)),
-        'step_size': scan_step*1e10, #tuple(s*1e10 for s in reversed(scan_step)),  # m to A
-        'rotation': props.detector_offset + scan_meta.rotation_deg # may be the other way around 
+        "shape": tuple(reversed(scan_shape)),
+        "step_size": scan_step * 1e10, 
+        "rotation": (props.detector_rotation_offset or 0.0) + (scan_meta.rotation_deg or 0.0),  # may be the other way around
         # 'affine': metadata.scan_correction[::-1, ::-1] if metadata.scan_correction is not None else None,
     }
 
     if voltage is None:
-        raise ValueError("'kv'/'voltage' must be specified by metadata or passed to 'raw_data'")
+        raise ValueError(
+            "'kv'/'voltage' must be specified by metadata or passed to 'raw_data'"
+        )
     if diff_step is None:
-        raise ValueError("'diff_step' must be specified by metadata or passed to 'raw_data'")
+        raise ValueError(
+            "'diff_step' must be specified by metadata or passed to 'raw_data'"
+        )
 
     wavelength = Electron(voltage).wavelength
 
     if not path.exists():
         raise ValueError(f"Couldn't find nion data at path {path}")
 
-    flips = list((False, False, False))
+    flips: t.List[bool] = [False, False, False]
 
     for process_step in camera_processing:
-
         match process_step:
             case "flip_l_r":
                 flips[1] = True
-        
+
     logger.info(f"Loading with flips: {flips}")
 
-    patterns = load_4d(path, scan_shape, flips=flips, memmap=False)
+    patterns = load_4d(path, cast_length(scan_shape, 2), flips=cast_length(flips, 3), memmap=False)
     patterns = numpy.fft.ifftshift(patterns, axes=(-1, -2)).astype(numpy.float32)
-
 
     # if needs_scale:
     #     if metadata.e_scaling is None:
@@ -105,20 +95,22 @@ def load_nion(args: None, props: LoadNionProps) -> RawData:
 
     # patterns = numpy.transpose(patterns, (1, 0, 2, 3))
 
-    a = float(wavelength / (diff_step * 1e-3)) # recip. pixel size -> 1 / real space extent
+    a = float(
+        wavelength / (diff_step * 1e-3)
+    )  # recip. pixel size -> 1 / real space extent
 
     sampling = Sampling(cast_length(patterns.shape[-2:], 2), extent=(a, a))
 
     mask = numpy.zeros_like(patterns, shape=patterns.shape[-2:]).astype(numpy.float32)
 
-    mask[2:-2, 2:-2] = 1.
+    mask[2:-2, 2:-2] = 1.0
 
     return {
-        'patterns': patterns,
-        'mask': numpy.fft.ifftshift(mask, axes=(-1, -2)).astype(numpy.float32),
-        'sampling': sampling,
-        'wavelength': wavelength,
+        "patterns": patterns,
+        "mask": numpy.fft.ifftshift(mask, axes=(-1, -2)).astype(numpy.float32),
+        "sampling": sampling,
+        "wavelength": wavelength,
         # 'probe_hook': probe_hook,
-        'scan_hook': scan_hook,
-        'seed': None,
+        "scan_hook": scan_hook,
+        "seed": None,
     }
