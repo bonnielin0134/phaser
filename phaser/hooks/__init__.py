@@ -35,6 +35,7 @@ class LoadEmpadProps(Dataclass):
     adu: t.Optional[float] = None
     det_flips: t.Optional[t.Tuple[bool, bool, bool]] = None
 
+
 class LoadGatanProps(Dataclass):
     path: Path
     
@@ -48,6 +49,13 @@ class LoadNionProps(Dataclass):
     diff_step: float
     detector_rotation_offset: t.Optional[float] = None
     
+
+
+class LoadNionProps(Dataclass):
+    path: Path
+
+    diff_step: float
+    detector_rotation_offset: t.Optional[float] = None
 
 
 class LoadManualProps(Dataclass, kw_only=True):
@@ -79,7 +87,7 @@ class LoadManualProps(Dataclass, kw_only=True):
 class RawDataHook(Hook[None, RawData]):
     known = {
         'empad': ('phaser.hooks.io.empad:load_empad', LoadEmpadProps),
-        'gatan': ('phaser.hooks.io.gatan:load_gatan', LoadGatanProps),
+        'gatan': ('phaser.hooks.io.gatan:load_gatan', LoadGatanProps, ('rsciio',)),
         'nion': ('phaser.hooks.io.nion:load_nion', LoadNionProps),
         'manual': ('phaser.hooks.io.manual:load_manual', LoadManualProps),
     }
